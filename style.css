@@ -1,11 +1,12 @@
 body{
     margin: 0;
-    background-image: linear-gradient(red, yellow);
+    background-image: linear-gradient(red, black);
     width: 100vw;
     height: 100vh;
 }
 
 canvas{
     position: fixed;
-    display: block;
+    /*width: 100%;
+    height: 100%;*/
 }

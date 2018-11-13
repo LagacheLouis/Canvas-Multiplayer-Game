@@ -1,27 +1,57 @@
 let socket = io.connect("/");
 let clientId;
+let onlinePlayers = new Array();
+function CreateOnlinePlayer(id){
+    if(id != clientId){
+        onlinePlayers.push(core.createEntity(new OnlinePlayer(id)));
+    }
+}
 
-socket.on("connection_granted",function(id){
-    clientId = id;
+function DestroyOnlinePlayer(id){
+    for(let i = 0;i<onlinePlayers.length;i++){
+        if(onlinePlayers[i].id = id){
+            core.destroyEntity(onlinePlayers[i]);
+            onlinePlayers.splice(i,1);
+        }
+    }
+}
+
+socket.on("connection_granted",function(connectionData){
+    clientId = connectionData.client;
+    connectionData.otherClients.forEach(CreateOnlinePlayer);
 
     core.init();
-    core.loadlevel();
-    let player = core.createEntity(new Player(window.innerWidth/2,window.innerHeight/2));
+
+    let player = null;
+    socket.on("game_restart",function(){
+        core.destroyEntity(player);
+        core.world.loadlevel();
+        player = core.createEntity(new Player(window.innerWidth/2,window.innerHeight/2));
+    });
     
     setInterval(function(){
-        socket.emit("client_position", {position: player.position});
-    },1000/20);
+        if(player != null)
+            socket.emit("client_position", {position: player.position});
+    },1000/30);
 
-    let onlinePlayers = new Array();
+   
     socket.on("server_player_connect",function(id){
-        onlinePlayers.push(core.createEntity(new OnlinePlayer(id)));
+        CreateOnlinePlayer(id);
     });
 
     socket.on("server_position",function(data){
-        console.log(data);
         onlinePlayers.forEach((p)=>{
-            if(data.id = p.id)
+            if(data.id == p.id){
                 p.sync(data.position);
+            }
         })
+    });
+
+    socket.on("server_createBullet",function(data){
+        core.createEntity(new BulletTrail(data.position,data.dir));
+    });
+
+    socket.on("server_player_exit",function(id){
+        DestroyOnlinePlayer(id);
     });
 });

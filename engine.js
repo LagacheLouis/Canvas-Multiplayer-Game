@@ -2,13 +2,15 @@ const core = {};
 
 core.deltaTime = 0;
 core.time = 0;
-core.entities = new Array();
-core.ctx_world = null;
-ctx_entities = null;
 
-core.createEntity = function( entity){
-    this.entities.push(entity);
-    return entity;
+core.entities = new Array();
+core.world = null;
+core.renderer = null;
+
+core.createEntity = function(obj){
+    this.entities.push(obj);
+    //console.log(this.entities);
+    return obj;
 }
 
 core.destroyEntity = function(entity){
@@ -23,66 +25,40 @@ core.destroyEntity = function(entity){
 
 
 core.init = function(){
-    let canvas_map = document.getElementById("map");
-    let canvas_entities = document.getElementById("entities");
+    this.world = new World("world");
+    this.renderer = new Renderer("renderer");
 
-    this.ctx_world = canvas_map.getContext("2d");
+
+    let canvas_entities = document.getElementById("entities");
     ctx_entities = canvas_entities.getContext("2d");
 
-    setCanvasSize(canvas_map);
-    setCanvasSize(canvas_entities);
+    canvas_entities.width = window.innerWidth;
+    canvas_entities.height = window.innerHeight;
 
     this.deltaTime = 0;
     this.time = Date.now();
+
     function update(){
+
         ctx_entities.clearRect(0,0,window.innerWidth,window.innerHeight);
         this.deltaTime = (Date.now() - this.time)/1000;
         this.time = Date.now();
 
+        core.renderer.clear();
+        core.renderer.draw(core.world.canvas);
+
         core.entities.forEach((obj)=>{
-            obj.update();
+            if(typeof obj.update != "undefined")
+                obj.update();
         });
         core.entities.forEach((obj)=>{
-            obj.draw(ctx_entities);
+            if(typeof obj.draw != "undefined")
+                obj.draw(ctx_entities);
         });
 
         requestAnimationFrame(update);
     }
     update();
-}
-
-core.collision = function(x,y,w,h){
-    return this.collisionValue(x,y,w,h) != 0;
-}
-
-core.collisionValue = function(x,y,w,h){
-    let pix = this.ctx_world.getImageData(x - w/2, y - h/2, w, h).data; 
-    let averageOpacity = 0;
-    for (var i = 0, n = pix.length; i < n; i += 4) {
-        averageOpacity += pix[i+3];
-    }
-    averageOpacity = (averageOpacity/(w*h))/255;
-    return averageOpacity;
-}
-
-core.loadlevel = function(){
-    this.ctx_world.clearRect(0,0,window.innerWidth,window.innerHeight);
-    let img = new Image();
-    img.onload = ()=>{
-        this.ctx_world.drawImage(img,0, 0,window.innerWidth,window.innerHeight);
-    }
-    img.src = "levels/test2.png";
-}
-
-core.digMap = function(x,y,radius){
-    this.ctx_world.save();
-    this.ctx_world.translate(x, y);
-    this.ctx_world.beginPath();
-    this.ctx_world.globalCompositeOperation = 'destination-out';
-    this.ctx_world.arc(0,0,radius,0,2 * Math.PI);
-    this.ctx_world.fill();
-    this.ctx_world.globalCompositeOperation = 'source-over';
-    this.ctx_world.restore();
 }
 
 class InputManager{
@@ -133,9 +109,80 @@ class InputManager{
 }
 core.inputs = new InputManager();
 
-function setCanvasSize(canvas){
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+class World{
+    constructor(id){
+        this.canvas = document.getElementById(id);
+        this.ctx = this.canvas.getContext("2d");
+        this.canvas.width = 1500;
+        this.canvas.height = 750;
+        this.canvas.style.display = "none";
+        setImageSmoothing(this.ctx,false);
+    }
+
+    collision(x,y,w,h){
+        return this.collisionValue(x,y,w,h) != 0;
+    }
+    
+    collisionValue(x,y,w,h){
+        let pix = this.ctx.getImageData(x - w/2, y - h/2, w, h).data; 
+        let averageOpacity = 0;
+        for (var i = 0, n = pix.length; i < n; i += 4) {
+            averageOpacity += pix[i+3];
+        }
+        averageOpacity = (averageOpacity/(w*h))/255;
+        return averageOpacity;
+    }
+    
+    loadlevel(){
+        this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+        let img = new Image();
+        img.onload = ()=>{
+            this.ctx.drawImage(img,0, 0,this.canvas.width,this.canvas.height);
+            /*this.ctx.rect(0,0,this.canvas.width,this.canvas.height);
+            this.ctx.fillStyle = "green";
+            this.ctx.fill();*/
+        }
+        img.src = "levels/test2.png";
+    }
+
+    dig(x,y,radius){
+        this.ctx.save();
+        this.ctx.translate(x, y);
+        this.ctx.beginPath();
+        this.ctx.globalCompositeOperation = 'destination-out';
+        this.ctx.arc(0,0,radius,0,2 * Math.PI);
+        this.ctx.fill();
+        this.ctx.globalCompositeOperation = 'source-over';
+        this.ctx.restore();
+    }
+}
+
+class Renderer{
+    constructor(id){
+        this.canvas = document.getElementById(id);
+        this.ctx = this.canvas.getContext("2d");
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+        this.position = {x: 0,y: 0,z: 0};
+    }
+
+    moveCamera(x,y,z){
+        this.position.x = x;
+        this.position.y = y;
+        this.position.z = z;
+    }
+
+    getOffset(){
+        return {x: this.position.x - this.canvas.width/2,y: this.position.y - this.canvas.height/2,z: this.position.z};
+    }
+
+    draw(data){
+        this.ctx.drawImage(data,-this.getOffset().x, -this.getOffset().y,data.width,data.height);
+    }
+    
+    clear(){
+        this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+    }
 }
 
 function setImageSmoothing(ctx,val){
