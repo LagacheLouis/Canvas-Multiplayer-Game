@@ -68,6 +68,7 @@ class InputManager{
 
         document.onkeydown = (e) => {
             this.removeKey(e.key);
+            console.log(e.key);
             this.keys.push(e.key);
         };
 

@@ -12,60 +12,67 @@ app.get('/', function(req, res){
 
 
 io.on('connection', function(socket){
-    connected_ids.push(socket.id);
 
-    io.to(socket.id).emit("connection_granted",{client: socket.id, otherClients: connected_ids});
-    io.emit("server_player_connect",socket.id);
+    socket.on("client_connection",function(pseudo){
 
-    console.log("client "+socket.id+" is connected, "+connected_ids.length+" online");
+        let client = new GameClient(socket.id,pseudo);
+        connected_clients.push(client);
 
-    let lastMovement = Date.now();
+        io.to(socket.id).emit("connection_granted",{client: socket.id, otherClients: connected_clients});
+        io.emit("server_player_connect",client);
 
-    tryRestart();
+        console.log("client "+socket.id+" is connected, "+connected_clients.length+" online");
 
-    socket.on("client_position",function(data){
-        data.id = socket.id;
-        io.emit("server_position",data);
-        lastMovement = Date.now();
-    });
-
-    //Objects instantiation
-    socket.on("client_createBullet",function(data){
-        io.emit("server_createBullet",data);
-    });
-
-    socket.on("client_death",function(){
-        players_alive--;
         tryRestart();
-    });
 
-    socket.on('disconnect', function(){
-        deleteId(socket.id);
-        io.emit("server_player_exit",socket.id); 
-        players_alive--;
-        console.log("client "+socket.id+" is disconnected, "+connected_ids.length+" online");
+        socket.on("client_position",function(data){
+            data.id = socket.id;
+            io.emit("server_position",data);
+        });
+
+        //Objects instantiation
+        socket.on("client_createBullet",function(data){
+            io.emit("server_createBullet",data);
+        });
+
+        socket.on("client_death",function(){
+            client.alive = false;
+            tryRestart();
+        });
+
+        socket.on('disconnect', function(){
+            deleteId(socket.id);
+            io.emit("server_player_exit",client);
+            console.log("client "+socket.id+" is disconnected, "+connected_clients.length+" online");
+        });
+
+        socket.on("client_inactive",function(){
+            socket.disconnect();
+        });
     });
 });
 
 
 
-let connected_ids = new Array();
+
+let connected_clients = new Array();
 
 function deleteId(id){
-    for(let i = 0;i<connected_ids.length;i++){
-        if(connected_ids[i] == id)
-            connected_ids.splice(i,1);
+    for(let i = 0;i<connected_clients.length;i++){
+        if(connected_clients[i].id == id)
+            connected_clients.splice(i,1);
     }
 }
 
-let players_alive = 0;
 function tryRestart(){
-    if(players_alive <= 1){
-        io.emit("game_restart");
-        players_alive = connected_ids.length;
-        console.log("game restarting");
+    let alives = connected_clients.filter(client => client.alive);
+    console.log(alives.length+" player(s) alive");
+    if(alives.length <= 1){
+        io.emit("game_restart",alives[0]);
+        connected_clients.forEach((client)=>{
+            client.alive = true;
+        });
     }
-    console.log(players_alive);
 }
 
 http.listen(3000, function(){
@@ -73,17 +80,9 @@ http.listen(3000, function(){
 });
 
 class GameClient{
-    constructor(id){
+    constructor(id, pseudo){
         this.id = id;
-        this.lastSync = Date.now();
-    }
-
-    wakeUp(){
-        this.lastSync = Date.now();
-    }
-
-    checIdle(){
-        if(this.lastSync < Date.now() + 5000)
-        io.to(this.id).disconnect();
+        this.pseudo = pseudo;
+        this.alive = false;
     }
 }
