@@ -8,12 +8,14 @@ function vectorNormalize(vect){
 }
 
 class Player{
+    
     constructor(x,y){
         this.position = {x: x,y: y};
         this.momentum = {x: 0,y: 0};
         this.attackTimer = 0;
         this.isGrounded = false;
     }
+
     move(x,y){
         if(!core.world.collision(this.position.x,this.position.y + y * deltaTime,10,20)){
             this.position.y += y * deltaTime;
@@ -74,20 +76,20 @@ class Player{
         //IS GROUNDED
         if(this.isGrounded){
             if(core.inputs.getKey("z")){
-                this.momentum.y = -200;
+                this.momentum.y = -400;
             }
         }
 
         core.renderer.moveCamera(this.position.x,this.position.y,0);
 
         this.attackTimer += deltaTime;
-        if(this.attackTimer > 0.3 && core.inputs.getKey("click")){
+        if(this.attackTimer > 0.1 && core.inputs.getKey("click")){
             this.attackTimer = 0;
             let dir = vectorNormalize({x: core.inputs.mousepos.x - this.position.x + core.renderer.getOffset().x, y: core.inputs.mousepos.y - this.position.y + core.renderer.getOffset().y}); 
             socket.emit("client_createBullet",{position: this.position, dir: dir});
         }
 
-        this.momentum.y = clamp(this.momentum.y + 300 * deltaTime,-300,150);
+        this.momentum.y = clamp(this.momentum.y + 300 * deltaTime,-500,150);
 
         this.move(this.momentum.x,this.momentum.y);
 
@@ -112,10 +114,6 @@ class OnlinePlayer{
         this.position = position;
     }
 
-    update(){
-
-    }
-
     draw(ctx){
         drawRect(ctx,this.position.x - core.renderer.getOffset().x,this.position.y - core.renderer.getOffset().y,10,20,"blue");
     }
@@ -132,7 +130,7 @@ class BulletTrail{
 
         this.hit = raycast(this.position.x,this.position.y,this.dir.x,this.dir.y,1000);
         if(this.hit){
-            core.world.dig(this.hit.x,this.hit.y,50);
+            core.world.dig(this.hit.x,this.hit.y,30);
         }else{
             this.hit = {x: this.position.x + this.dir.x * 1000,y: this.position.y + this.dir.y * 1000};
         }

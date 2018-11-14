@@ -17,6 +17,8 @@ function DestroyOnlinePlayer(id){
 }
 
 socket.on("connection_granted",function(connectionData){
+    console.log("connected");
+
     clientId = connectionData.client;
     connectionData.otherClients.forEach(CreateOnlinePlayer);
 
@@ -53,5 +55,9 @@ socket.on("connection_granted",function(connectionData){
 
     socket.on("server_player_exit",function(id){
         DestroyOnlinePlayer(id);
+    });
+
+    socket.on('disconnect', function(){
+        console.log("disconnected")
     });
 });

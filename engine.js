@@ -113,8 +113,8 @@ class World{
     constructor(id){
         this.canvas = document.getElementById(id);
         this.ctx = this.canvas.getContext("2d");
-        this.canvas.width = 1500;
-        this.canvas.height = 750;
+        this.canvas.width = 2000;
+        this.canvas.height = 2000;
         this.canvas.style.display = "none";
         setImageSmoothing(this.ctx,false);
     }
@@ -137,12 +137,12 @@ class World{
         this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
         let img = new Image();
         img.onload = ()=>{
-            this.ctx.drawImage(img,0, 0,this.canvas.width,this.canvas.height);
-            /*this.ctx.rect(0,0,this.canvas.width,this.canvas.height);
+           this.ctx.drawImage(img,0, 0,this.canvas.width,this.canvas.height);
+           /* this.ctx.rect(0,0,this.canvas.width,this.canvas.height);
             this.ctx.fillStyle = "green";
             this.ctx.fill();*/
         }
-        img.src = "levels/test2.png";
+        img.src = "levels/level.png";
     }
 
     dig(x,y,radius){
@@ -175,7 +175,7 @@ class Renderer{
     getOffset(){
         return {x: this.position.x - this.canvas.width/2,y: this.position.y - this.canvas.height/2,z: this.position.z};
     }
-
+ 
     draw(data){
         this.ctx.drawImage(data,-this.getOffset().x, -this.getOffset().y,data.width,data.height);
     }

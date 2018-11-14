@@ -17,14 +17,16 @@ io.on('connection', function(socket){
     io.to(socket.id).emit("connection_granted",{client: socket.id, otherClients: connected_ids});
     io.emit("server_player_connect",socket.id);
 
-    //console.log("client "+socket.id+" is connected, "+connected_ids.length+" online");
+    console.log("client "+socket.id+" is connected, "+connected_ids.length+" online");
+
+    let lastMovement = Date.now();
 
     tryRestart();
 
     socket.on("client_position",function(data){
         data.id = socket.id;
         io.emit("server_position",data);
-        resetTimeout();
+        lastMovement = Date.now();
     });
 
     //Objects instantiation
@@ -43,16 +45,6 @@ io.on('connection', function(socket){
         players_alive--;
         console.log("client "+socket.id+" is disconnected, "+connected_ids.length+" online");
     });
-
-    let kicker;
-    function resetTimeout(){
-        clearTimeout(kicker);
-        kicker = setTimeout(function(){
-            socket.disconnect();
-        },2000);
-    }
-
-
 });
 
 
@@ -79,3 +71,19 @@ function tryRestart(){
 http.listen(3000, function(){
   console.log('listening on *:3000');
 });
+
+class GameClient{
+    constructor(id){
+        this.id = id;
+        this.lastSync = Date.now();
+    }
+
+    wakeUp(){
+        this.lastSync = Date.now();
+    }
+
+    checIdle(){
+        if(this.lastSync < Date.now() + 5000)
+        io.to(this.id).disconnect();
+    }
+}
