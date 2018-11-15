@@ -14,41 +14,42 @@ app.get('/', function(req, res){
 io.on('connection', function(socket){
 
     socket.on("client_connection",function(pseudo){
+        if(connected_clients.filter(client => client.id == socket.id).length == 0){
+            let client = new GameClient(socket.id,pseudo);
+            connected_clients.push(client);
 
-        let client = new GameClient(socket.id,pseudo);
-        connected_clients.push(client);
+            io.to(socket.id).emit("connection_granted",{client: socket.id, otherClients: connected_clients});
+            io.emit("server_player_connect",client);
 
-        io.to(socket.id).emit("connection_granted",{client: socket.id, otherClients: connected_clients});
-        io.emit("server_player_connect",client);
+            console.log("client "+socket.id+" is connected, "+connected_clients.length+" online");
 
-        console.log("client "+socket.id+" is connected, "+connected_clients.length+" online");
-
-        tryRestart();
-
-        socket.on("client_position",function(data){
-            data.id = socket.id;
-            io.emit("server_position",data);
-        });
-
-        //Objects instantiation
-        socket.on("client_createBullet",function(data){
-            io.emit("server_createBullet",data);
-        });
-
-        socket.on("client_death",function(){
-            client.alive = false;
             tryRestart();
-        });
 
-        socket.on('disconnect', function(){
-            deleteId(socket.id);
-            io.emit("server_player_exit",client);
-            console.log("client "+socket.id+" is disconnected, "+connected_clients.length+" online");
-        });
+            socket.on("client_position",function(data){
+                data.id = socket.id;
+                io.emit("server_position",data);
+            });
 
-        socket.on("client_inactive",function(){
-            socket.disconnect();
-        });
+            //Objects instantiation
+            socket.on("client_createBullet",function(data){
+                io.emit("server_createBullet",data);
+            });
+
+            socket.on("client_death",function(){
+                client.alive = false;
+                tryRestart();
+            });
+
+            socket.on('disconnect', function(){
+                deleteId(socket.id);
+                io.emit("server_player_exit",client);
+                console.log("client "+socket.id+" is disconnected, "+connected_clients.length+" online");
+            });
+
+            socket.on("client_inactive",function(){
+                socket.disconnect();
+            });
+        }
     });
 });
 

@@ -29,6 +29,8 @@ window.onload = function(){
 
 socket.on("connection_granted",function(connectionData){
 
+    document.getElementById("connexion").style.display = "none";
+
     clientId = connectionData.client;
     core.init();
     connectionData.otherClients.forEach(CreateOnlinePlayer);
@@ -72,11 +74,14 @@ socket.on("connection_granted",function(connectionData){
     });
 
     socket.on("server_createBullet",function(data){
-        core.createEntity(new BulletTrail(data.position,data.dir));
+        core.createEntity(new BulletTrail(data));
     });
 
     socket.on('disconnect', function(){
         log("You have been DISCONNECTED");
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
     });
 });
 

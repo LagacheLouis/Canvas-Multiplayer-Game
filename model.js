@@ -1,16 +1,3 @@
-function vectorMagnitude(vect){
-    return Math.sqrt(Math.pow(vect.x,2) + Math.pow(vect.y,2));
-}
-
-function vectorNormalize(vect){
-    let magnitude = vectorMagnitude(vect);
-    if(magnitude != 0){
-        return {x: vect.x/magnitude, y: vect.y/magnitude};
-    }else{
-        return {x: 0, y: 0};
-    }
-}
-
 class Player{
     
     constructor(x,y){
@@ -78,6 +65,10 @@ class Player{
         this.momentum.y += y;
     }
 
+    collision(position){
+        let delta = {x: this.position.x - position.x,y: this.position.y - position.y};
+        return vectorMagnitude(delta) < 10;
+    }
 
     update(){
         if(core.inputs.getKey("q") && this.momentum.x > -200){
@@ -110,7 +101,7 @@ class Player{
         if(this.attackTimer > 0.3 && core.inputs.getKey("click")){
             this.attackTimer = 0;
             let dir = vectorNormalize({x: core.inputs.mousepos.x - this.position.x + core.renderer.getOffset().x, y: core.inputs.mousepos.y - this.position.y + core.renderer.getOffset().y}); 
-            socket.emit("client_createBullet",{position: this.position, dir: dir});
+            socket.emit("client_createBullet",{id: clientId, position: this.position, dir: dir});
         }
        
         this.move(this.momentum.x,this.momentum.y);
@@ -164,9 +155,9 @@ class OnlinePlayer{
 }
 
 class BulletTrail{
-    constructor(position,dir){
-        this.position = position;
-        this.dir = dir;
+    constructor(data){
+        this.position = data.position;
+        this.dir = data.dir;
         this.color = "yellow";
 
         this.hit = raycast(this.position.x,this.position.y,this.dir.x,this.dir.y,1000);
@@ -213,17 +204,5 @@ class BulletTrail{
         ctx.lineWidth = 3;
         ctx.stroke();
     }
-}
-
-function raycast(x,y,dirx,diry,distance){
-    let collidePosition = {x: x,y: y};
-    for(let i = 0; i<distance * 2; i++){
-        collidePosition.x += dirx/2 * i;
-        collidePosition.y += diry/2 * i;
-        if(core.world.collision(collidePosition.x-1,collidePosition.y-1,3,3)){
-            return collidePosition;
-        }
-    }
-    return null;
 }
 
