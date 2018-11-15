@@ -101,7 +101,7 @@ class Player{
         if(this.attackTimer > 0.3 && core.inputs.getKey("click")){
             this.attackTimer = 0;
             let dir = vectorNormalize({x: core.inputs.mousepos.x - this.position.x + core.renderer.getOffset().x, y: core.inputs.mousepos.y - this.position.y + core.renderer.getOffset().y}); 
-            socket.emit("client_createBullet",{id: clientId, position: this.position, dir: dir});
+            socket.emit("client_createBullet",{bulletId : Math.random(),position: this.position, dir: dir});
         }
        
         this.move(this.momentum.x,this.momentum.y);
@@ -154,55 +154,75 @@ class OnlinePlayer{
     }
 }
 
-class BulletTrail{
-    constructor(data){
-        this.position = data.position;
-        this.dir = data.dir;
-        this.color = "yellow";
+let bullets = new Array();
 
-        this.hit = raycast(this.position.x,this.position.y,this.dir.x,this.dir.y,1000);
-        if(this.hit){
-            core.world.dig(this.hit.x,this.hit.y,50);
-        }else{
-            this.hit = {x: this.position.x + this.dir.x * 1000,y: this.position.y + this.dir.y * 1000};
+function getBullet(id){
+    for(let i = 0;i<bullets.length;i++){
+        if(bullets[i].id == id){
+            return bullets[i];
         }
+    }
+    console.log(id + "do not exist");
+    return null;
+}
 
-        let playerdelta = {x: player.position.x - this.hit.x, y: player.position.y - this.hit.y};
+class Bullet{
+    constructor(data){
+        this.id = data.bulletId;
+        this.position = data.position;
+        this.oldPosition = this.position;
+        this.dir = data.dir;
 
+        this.calculatePhysics = false;
+        if(data.id == clientId){
+            this.calculatePhysics = true;
+        }
+    }
+
+    update(){
+        this.oldPosition = {x: this.position.x, y: this.position.y};
+        this.position.x +=  this.dir.x * deltaTime * 800;
+        this.position.y +=  this.dir.y * deltaTime * 800;
+        if(this.calculatePhysics){
+            if(core.world.collision(this.position.x,this.position.y,5,5)){
+                socket.emit("client_bulletHit",{id:this.id,position: this.position});
+            }else{
+                onlinePlayers.forEach((player) =>{
+                    if(vectorMagnitude({x: player.position.x - this.position.x, y: player.position.y - this.position.y}) < 10){
+                        socket.emit("client_bulletHit",{id:this.id,position: this.position});
+                    }
+                });
+            }
+        }
+    }
+
+    hit(data){
+
+        let playerdelta = {x: player.position.x - data.position.x, y: player.position.y - data.position.y};
         if(vectorMagnitude(playerdelta) < 80){
             let norm = vectorNormalize(playerdelta);
             player.knock(norm.x * 1000,norm.y * 1000);
         }
+        core.world.dig(data.position.x,data.position.y,50);
 
-        this.speed = 500;
-        this.magnitude = vectorMagnitude({x: this.hit.x - this.position.x,y: this.hit.y - this.position.y});
+        ctx_particles.beginPath();
+        ctx_particles.arc(data.position.x,data.position.y,80,0,2 * Math.PI);
+        ctx_particles.fillStyle = "yellow";
+        ctx_particles.fill();
+        ctx_particles.beginPath();
+        ctx_particles.arc(data.position.x,data.position.y,30,0,2 * Math.PI);
+        ctx_particles.fillStyle = "white";
+        ctx_particles.fill();
 
-        this.test = false;
-    }
-
-    update(){
-        if(this.test){
-            let oldmagnitude = vectorMagnitude({x: this.hit.x - this.position.x,y: this.hit.y - this.position.y});
-            this.position.x += this.dir.x * this.speed * deltaTime * 3;
-            this.position.y += this.dir.y * this.speed * deltaTime * 3;
-            this.magnitude = vectorMagnitude({x: this.hit.x - this.position.x,y: this.hit.y - this.position.y});
-            if(oldmagnitude < this.magnitude)
-                core.destroyEntity(this);
-        }else{
-            this.test = true;
-        }
+        core.destroyEntity(this);
     }
 
     draw(ctx){
-
-        let of = core.renderer.getOffset();
-
-        ctx.beginPath();
-        ctx.moveTo(this.position.x - of.x,this.position.y - of.y);
-        ctx.lineTo(this.hit.x - of.x,this.hit.y - of.y);
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = 3;
-        ctx.stroke();
+        ctx_particles.beginPath();
+        ctx_particles.moveTo(this.oldPosition.x,this.oldPosition.y);
+        ctx_particles.lineTo(this.position.x,this.position.y);
+        ctx_particles.lineWidth = 5;
+        ctx_particles.strokeStyle = "yellow";
+        ctx_particles.stroke();
     }
 }
-

@@ -32,7 +32,12 @@ io.on('connection', function(socket){
 
             //Objects instantiation
             socket.on("client_createBullet",function(data){
+                data.id = socket.id;
                 io.emit("server_createBullet",data);
+            });
+
+            socket.on("client_bulletHit",function(data){
+                io.emit("server_bulletHit",data);
             });
 
             socket.on("client_death",function(){

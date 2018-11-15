@@ -5,7 +5,6 @@ let onlinePlayers = new Array();
 let player = null;
 
 function CreateOnlinePlayer(client){
-    console.log(client);
     if(client.id != clientId){
         onlinePlayers.push(core.createEntity(new OnlinePlayer(client.id,client.pseudo)));
     }
@@ -42,7 +41,8 @@ socket.on("connection_granted",function(connectionData){
         core.destroyEntity(player);
         core.world.loadlevel();
         player = core.createEntity(new Player(window.innerWidth/2,window.innerHeight/2));
-        log(winner.pseudo + " won  the game");
+        if(winner != null)
+            log(winner.pseudo + " won  the game");
         log("---- game restarting ----");
     });
     
@@ -74,7 +74,14 @@ socket.on("connection_granted",function(connectionData){
     });
 
     socket.on("server_createBullet",function(data){
-        core.createEntity(new BulletTrail(data));
+        let bullet = new Bullet(data);
+        bullets.push(bullet);
+        core.createEntity(bullet);
+    });
+
+    socket.on("server_bulletHit",function(data){
+        console.log(data,bullets);
+        getBullet(data.id).hit(data);
     });
 
     socket.on('disconnect', function(){

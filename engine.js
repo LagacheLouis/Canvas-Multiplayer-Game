@@ -7,6 +7,8 @@ core.entities = new Array();
 core.world = null;
 core.renderer = null;
 
+ctx_particles = null;
+
 core.createEntity = function(obj){
     this.entities.push(obj);
     //console.log(this.entities);
@@ -17,6 +19,7 @@ core.destroyEntity = function(entity){
     for(let i = 0; i < this.entities.length; i++){
         if(this.entities[i] == entity){
             this.entities.splice(i,1);
+            console.log("remove");
         }
     }
     entity = null;
@@ -35,17 +38,29 @@ core.init = function(){
     canvas_entities.width = window.innerWidth;
     canvas_entities.height = window.innerHeight;
 
+    let canvas_particles = document.getElementById("particles");
+    ctx_particles = canvas_particles.getContext("2d");
+
+    canvas_particles.width = 2000;
+    canvas_particles.height = 2000;
+
     this.deltaTime = 0;
     this.time = Date.now();
 
     function update(){
 
         ctx_entities.clearRect(0,0,window.innerWidth,window.innerHeight);
+
+
+        
+
         this.deltaTime = (Date.now() - this.time)/1000;
         this.time = Date.now();
 
         core.renderer.clear();
         core.renderer.draw(core.world.canvas);
+        core.renderer.draw(canvas_particles);
+
 
         core.entities.forEach((obj)=>{
             if(typeof obj.update != "undefined")
@@ -55,6 +70,13 @@ core.init = function(){
             if(typeof obj.draw != "undefined")
                 obj.draw(ctx_entities);
         });
+
+        ctx_particles.globalCompositeOperation = 'destination-out';
+        ctx_particles.rect(0,0,2000,2000);
+        ctx_particles.globalAlpha = 0.2;
+        ctx_particles.fill();
+        ctx_particles.globalAlpha = 1;
+        ctx_particles.globalCompositeOperation = 'source-over';
 
         requestAnimationFrame(update);
     }
