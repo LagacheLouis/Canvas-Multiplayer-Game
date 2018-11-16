@@ -5,6 +5,7 @@
   <title>Canvas Game</title>
   <link rel="stylesheet" href="style.css">
   <script src="/socket.io/socket.io.js"></script>
+  <script src="simplex.js"></script>
   <script src="tools.js"></script>
   <script src="engine.js"></script>
   <script src="model.js"></script>
@@ -15,10 +16,21 @@
         <input type="text">
         <button>JOIN</button>
     </div>
+
     <canvas id="particles" style="display:none"></canvas>
+    <canvas id="light"></canvas>
     <canvas id="renderer"></canvas>
     <canvas id="world"></canvas>
     <canvas id="entities"></canvas>
+
+    <p id="position"></p>
+
+    <div id="ui">
+        <div id="fuel">
+            <div></div>
+        </div>
+        <p id="charge">0</p>
+    </div>
     <div id="log"></div>
 </body>
 </html>

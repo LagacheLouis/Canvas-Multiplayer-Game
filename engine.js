@@ -7,11 +7,8 @@ core.entities = new Array();
 core.world = null;
 core.renderer = null;
 
-ctx_particles = null;
-
 core.createEntity = function(obj){
     this.entities.push(obj);
-    //console.log(this.entities);
     return obj;
 }
 
@@ -19,7 +16,6 @@ core.destroyEntity = function(entity){
     for(let i = 0; i < this.entities.length; i++){
         if(this.entities[i] == entity){
             this.entities.splice(i,1);
-            console.log("remove");
         }
     }
     entity = null;
@@ -30,7 +26,7 @@ core.destroyEntity = function(entity){
 core.init = function(){
     this.world = new World("world");
     this.renderer = new Renderer("renderer");
-
+    this.light = new Light("light");
 
     let canvas_entities = document.getElementById("entities");
     ctx_entities = canvas_entities.getContext("2d");
@@ -38,11 +34,6 @@ core.init = function(){
     canvas_entities.width = window.innerWidth;
     canvas_entities.height = window.innerHeight;
 
-    let canvas_particles = document.getElementById("particles");
-    ctx_particles = canvas_particles.getContext("2d");
-
-    canvas_particles.width = 2000;
-    canvas_particles.height = 2000;
 
     this.deltaTime = 0;
     this.time = Date.now();
@@ -51,16 +42,13 @@ core.init = function(){
 
         ctx_entities.clearRect(0,0,window.innerWidth,window.innerHeight);
 
-
-        
-
         this.deltaTime = (Date.now() - this.time)/1000;
         this.time = Date.now();
 
         core.renderer.clear();
         core.renderer.draw(core.world.canvas);
-        core.renderer.draw(canvas_particles);
 
+        //core.light.draw();
 
         core.entities.forEach((obj)=>{
             if(typeof obj.update != "undefined")
@@ -70,13 +58,6 @@ core.init = function(){
             if(typeof obj.draw != "undefined")
                 obj.draw(ctx_entities);
         });
-
-        ctx_particles.globalCompositeOperation = 'destination-out';
-        ctx_particles.rect(0,0,2000,2000);
-        ctx_particles.globalAlpha = 0.2;
-        ctx_particles.fill();
-        ctx_particles.globalAlpha = 1;
-        ctx_particles.globalCompositeOperation = 'source-over';
 
         requestAnimationFrame(update);
     }
@@ -90,7 +71,6 @@ class InputManager{
 
         document.onkeydown = (e) => {
             this.removeKey(e.key);
-            console.log(e.key);
             this.keys.push(e.key);
         };
 
@@ -164,6 +144,7 @@ class World{
            /* this.ctx.rect(0,0,this.canvas.width,this.canvas.height);
             this.ctx.fillStyle = "green";
             this.ctx.fill();*/
+            //core.light.calculate();
         }
         img.src = "levels/level.png";
     }
@@ -177,6 +158,8 @@ class World{
         this.ctx.fill();
         this.ctx.globalCompositeOperation = 'source-over';
         this.ctx.restore();
+
+        //core.light.calculate();
     }
 }
 
@@ -213,4 +196,48 @@ function setImageSmoothing(ctx,val){
     ctx.webkitImageSmoothingEnabled = val;
     ctx.msImageSmoothingEnabled = val;
     ctx.imageSmoothingEnabled = val;
+}
+
+class Light{
+    constructor(id){
+        this.canvas = document.getElementById(id);
+        this.ctx = this.canvas.getContext("2d");
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+
+        this.hits = new Array();
+    }
+
+    calculate(){
+        this.hits.length = 0;
+        let precision = 300;
+        for(let i = 0;i<precision;i++){
+            this.hits.push(raycast(i * (2000/precision),0,0,1,2000));
+        }
+    }
+
+    draw(){
+        this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+        let of = core.renderer.getOffset();
+        this.ctx.beginPath();
+        this.ctx.moveTo(0,0);
+        this.hits.forEach((hit)=>{       
+            this.ctx.lineTo(hit.x - of.x,hit.y - of.y);
+        });
+        this.ctx.lineTo(this.canvas.width,0);
+        this.ctx.fillStyle = "rgb(255,255,255,0.5)";
+        this.ctx.fill();
+    }
+}
+
+function raycast(x,y,dirx,diry,distance){
+    let collidePosition = {x: x,y: y};
+    for(let i = 0; i<distance * 2; i++){
+        collidePosition.x += dirx/2 * i;
+        collidePosition.y += diry/2 * i;    
+        if(core.world.collision(collidePosition.x-1,collidePosition.y-1,3,3)){
+            return collidePosition;
+        }
+    }
+    return collidePosition;
 }

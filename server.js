@@ -75,6 +75,7 @@ function tryRestart(){
     console.log(alives.length+" player(s) alive");
     if(alives.length <= 1){
         io.emit("game_restart",alives[0]);
+        console.log("restart ...");
         connected_clients.forEach((client)=>{
             client.alive = true;
         });

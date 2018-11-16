@@ -7,6 +7,13 @@ class Player{
         this.isGrounded = false;
         this.jetPackMaxFuel = 3;
         this.jetPackFuel = 3;
+        this.charge = 0;
+
+        this.useJetPack = false;
+
+        this.particleTimer = 0;
+
+        this.godmode = false;
     }
 
     move(x,y){
@@ -80,43 +87,71 @@ class Player{
             this.momentum.x -= Math.sign(this.momentum.x) * 300 * deltaTime;
         }
 
+        this.particleTimer += deltaTime;
+
         //IS GROUNDED
        if(this.isGrounded){
             this.jetPackFuel = clamp(this.jetPackFuel + deltaTime,0,this.jetPackMaxFuel);
            if(core.inputs.getKey("z") && this.momentum.y > -200){
                 this.momentum.y = -200;
             }
+            this.useJetPack = false;
         }else if(core.inputs.getKey("z") && this.jetPackFuel > 0 && this.momentum.y > -150){
             if(this.momentum.y > -200){
                 this.momentum.y -= 1000 * deltaTime;
-                this.jetPackFuel = clamp(this.jetPackFuel - deltaTime,0,this.jetPackMaxFuel);
+                if(!this.godmode)
+                    this.jetPackFuel = clamp(this.jetPackFuel - deltaTime,0,this.jetPackMaxFuel);
             }
+            core.createEntity(new JetPackParticle(this.position));
+            this.useJetPack = true;
         }else  if(this.momentum.y < 200){
             this.momentum.y += 500 * deltaTime;
+            this.useJetPack = false;
         }
 
         core.renderer.moveCamera(this.position.x,this.position.y,0);
 
         this.attackTimer += deltaTime;
-        if(this.attackTimer > 0.3 && core.inputs.getKey("click")){
+
+        if(core.inputs.getKey("click")){
+            if(this.charge < 500){
+                this.charge += 25 * deltaTime;
+                 if(this.godmode)
+                    this.charge = 500;
+            }else{
+                this.charge = 500;
+            }
+        }else if(this.charge > 0 && this.attackTimer > 0.3){
             this.attackTimer = 0;
             let dir = vectorNormalize({x: core.inputs.mousepos.x - this.position.x + core.renderer.getOffset().x, y: core.inputs.mousepos.y - this.position.y + core.renderer.getOffset().y}); 
-            socket.emit("client_createBullet",{bulletId : Math.random(),position: this.position, dir: dir});
+            socket.emit("client_createBullet",{bulletId : Math.random(),position: this.position, dir: dir, charge: this.charge});
+            this.charge = 0;
         }
        
         this.move(this.momentum.x,this.momentum.y);
 
-        if(this.position.y > core.world.canvas.height + 100){
+        if(this.position.y > core.world.canvas.height + 100 || this.position.x < -2000 || this.position.x > core.world.canvas.width + 2000){
             socket.emit("client_death");
+            core.createEntity(new Spectator());
             core.destroyEntity(this);
+        }
+
+        if(core.inputs.getKey("p")){
+           // this.godmode = true; 
         }
     }
 
     draw(ctx){
-        drawRect(ctx,window.innerWidth/2,10,300,10,"black");
-        drawRect(ctx,window.innerWidth/2,10,300 * this.jetPackFuel/this.jetPackMaxFuel,10,"orange");
-
+        document.getElementById("position").innerText = parseInt(this.position.x) + " "+ parseInt(this.position.y);
+        document.getElementById("charge").innerText = parseInt(this.charge);
+        document.querySelector("#fuel div").style.width = this.jetPackFuel/this.jetPackMaxFuel * 100 +"%";
         drawRect(ctx,this.position.x - core.renderer.getOffset().x,this.position.y - core.renderer.getOffset().y,10,20,"red");
+        let val = 2000;
+
+        ctx.beginPath();
+        ctx.rect(-val - core.renderer.getOffset().x,- val - core.renderer.getOffset().y, core.world.canvas.width + val * 2, core.world.canvas.height + val* 2);
+        ctx.strokeStyle = "blue";
+        ctx.stroke();
     }
 }
 
@@ -129,14 +164,20 @@ class OnlinePlayer{
         this.pseudo = pseudo;
 
         this.delta = {x: 0, y: 0};
+        this.useJetPack = false;
     }
 
-    sync(position){
-        this.position = position;
+    sync(data){
+        this.position = data.position;
+        this.useJetPack = data.useJetPack;
         this.delta = {x: this.position.x - this.renderPosition.x, y: this.position.y - this.renderPosition.y};
     }
 
     update(){
+        this.particleTimer += deltaTime;
+        if(this.useJetPack){
+            core.createEntity(new JetPackParticle(this.renderPosition));
+        }
         this.renderPosition.x += this.delta.x * deltaTime * syncSpeed;
         this.renderPosition.y += this.delta.y * deltaTime * syncSpeed;
     }
@@ -146,7 +187,7 @@ class OnlinePlayer{
 
         ctx.font = "15px Arial";
         ctx.textAlign = "center";
-        ctx.fillStyle= "rgba(128,128,128,0.5)";
+        ctx.fillStyle= "rgba(128,128,128,1)";
         ctx.fillText(this.pseudo,this.renderPosition.x - of.x,this.renderPosition.y - 20 - of.y);
         
 
@@ -172,57 +213,158 @@ class Bullet{
         this.position = data.position;
         this.oldPosition = this.position;
         this.dir = data.dir;
+        this.explosionSize = 30 + data.charge;
+        this.explosionPower = 500 + (data.charge/500) * 1000;
+
+
+        this.drawStates = new Array();
+        this.collide = false;
 
         this.calculatePhysics = false;
         if(data.id == clientId){
             this.calculatePhysics = true;
         }
+
+        this.explosionDuration = 0.2; 
     }
 
     update(){
-        this.oldPosition = {x: this.position.x, y: this.position.y};
-        this.position.x +=  this.dir.x * deltaTime * 800;
-        this.position.y +=  this.dir.y * deltaTime * 800;
-        if(this.calculatePhysics){
-            if(core.world.collision(this.position.x,this.position.y,5,5)){
-                socket.emit("client_bulletHit",{id:this.id,position: this.position});
-            }else{
-                onlinePlayers.forEach((player) =>{
-                    if(vectorMagnitude({x: player.position.x - this.position.x, y: player.position.y - this.position.y}) < 10){
-                        socket.emit("client_bulletHit",{id:this.id,position: this.position});
-                    }
-                });
+        if(!this.collide){
+            this.oldPosition = {x: this.position.x, y: this.position.y};
+            this.position.x +=  this.dir.x * deltaTime * 800;
+            this.position.y +=  this.dir.y * deltaTime * 800;
+            if(this.calculatePhysics){
+                if(core.world.collision(this.position.x,this.position.y,5,5)){
+                    socket.emit("client_bulletHit",{id:this.id,position: this.position});
+                }else{
+                    onlinePlayers.forEach((player) =>{
+                        if(vectorMagnitude({x: player.position.x - this.position.x, y: player.position.y - this.position.y}) < this.explosionSize/10 + 20){
+                            socket.emit("client_bulletHit",{id:this.id,position: this.position});
+                        }
+                    });
+                }
             }
+        }
+
+        this.drawStates.forEach((state)=>{
+            state.opacity -= deltaTime * 3;
+            if(state.opacity <= 0){
+                this.drawStates = this.drawStates.filter(state => state.opacity > 0);
+            } 
+        });
+
+        if(this.collide && this.drawStates.length == 0){
+            core.destroyEntity(this);
+        }
+        if(!this.collide){
+            this.drawStates.push({position: this.position,oldPosition: this.oldPosition, opacity: 1});
         }
     }
 
     hit(data){
 
         let playerdelta = {x: player.position.x - data.position.x, y: player.position.y - data.position.y};
-        if(vectorMagnitude(playerdelta) < 80){
+        if(vectorMagnitude(playerdelta) < this.explosionSize + 20){
             let norm = vectorNormalize(playerdelta);
-            player.knock(norm.x * 1000,norm.y * 1000);
+            player.knock(norm.x * this.explosionPower,norm.y * this.explosionPower);
         }
-        core.world.dig(data.position.x,data.position.y,50);
+        core.world.dig(data.position.x,data.position.y,this.explosionSize);
 
-        ctx_particles.beginPath();
-        ctx_particles.arc(data.position.x,data.position.y,80,0,2 * Math.PI);
-        ctx_particles.fillStyle = "yellow";
-        ctx_particles.fill();
-        ctx_particles.beginPath();
-        ctx_particles.arc(data.position.x,data.position.y,30,0,2 * Math.PI);
-        ctx_particles.fillStyle = "white";
-        ctx_particles.fill();
+        /**/
 
-        core.destroyEntity(this);
+        this.collide = true;
     }
 
     draw(ctx){
-        ctx_particles.beginPath();
-        ctx_particles.moveTo(this.oldPosition.x,this.oldPosition.y);
-        ctx_particles.lineTo(this.position.x,this.position.y);
-        ctx_particles.lineWidth = 5;
-        ctx_particles.strokeStyle = "yellow";
-        ctx_particles.stroke();
+        
+        let of = core.renderer.getOffset();
+
+        this.drawStates.forEach((state)=>{
+            ctx.beginPath();
+            ctx.moveTo(state.oldPosition.x - of.x,state.oldPosition.y - of.y);
+            ctx.lineTo(state.position.x - of.x,state.position.y - of.y);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#ffffcc";
+            ctx.globalAlpha = state.opacity;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        });
+
+        if(this.collide){
+            if(this.explosionDuration < 0.15 && this.explosionDuration > 0){
+                ctx.beginPath();
+                ctx.arc(this.position.x - of.x,this.position.y - of.y,this.explosionSize,0,2 * Math.PI);
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = "white";
+                ctx.fill();
+            }else if(this.explosionDuration >= 0.15){
+                ctx.beginPath();
+                ctx.arc(this.position.x - of.x,this.position.y - of.y,this.explosionSize,0,2 * Math.PI);
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = "black";
+                ctx.fill();
+            }
+            this.explosionDuration = clamp(this.explosionDuration - deltaTime,0,1);
+        }else{
+            ctx.beginPath();
+            ctx.arc(this.position.x - of.x,this.position.y - of.y,this.explosionSize/10,0,2 * Math.PI);
+            this.globalAlpha = 1;
+            ctx.fillStyle = "white";
+            ctx.fill();
+        }
+    }
+}
+
+let simplex = new SimplexNoise();
+class JetPackParticle{
+    constructor(position){
+        this.position = {x: position.x,y: position.y};
+        this.size = Math.random() * 5 + 3;
+        this.opacity = 1;
+        this.noiseX = Math.random() * 100; 
+        this.noiseY = Math.random() * 100;
+    }
+
+    update(){
+        this.opacity -= deltaTime/3;
+        if(this.opacity < 0)
+            core.destroyEntity(this);
+
+        this.noiseX += deltaTime;
+        this.noiseY += deltaTime;
+
+        this.position.x += simplex.noise2D(0,this.noiseX/5) * 25 * deltaTime;
+        this.position.y += simplex.noise2D(0,this.noiseY/5) * 25 * deltaTime;
+    }
+
+    draw(ctx){   
+        let of = core.renderer.getOffset();
+        ctx.beginPath();
+        ctx.arc(this.position.x - of.x,this.position.y - of.y,this.size,0,2 * Math.PI);
+        ctx.globalAlpha = this.opacity;
+        ctx.fillStyle = "white";
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+}
+
+class Spectator{
+    constructor(){
+        this.position = {x: core.world.canvas.width/2,y: core.world.canvas.height/2};
+        this.speed = 300;
+    }
+
+    update(){
+        document.getElementById("position").innerText = parseInt(this.position.x) + " "+ parseInt(this.position.y);
+        if(core.inputs.getKey("z"))
+            this.position.y -= this.speed * deltaTime;
+        if(core.inputs.getKey("q"))
+            this.position.x -= this.speed * deltaTime;
+        if(core.inputs.getKey("s"))
+            this.position.y += this.speed * deltaTime;
+        if(core.inputs.getKey("d"))
+            this.position.x += this.speed * deltaTime;
+
+        core.renderer.moveCamera(this.position.x,this.position.y,0);
     }
 }

@@ -33,15 +33,5 @@ function vectorNormalize(vect){
 }
 
 
-function raycast(x,y,dirx,diry,distance){
-    let collidePosition = {x: x,y: y};
-    for(let i = 0; i<distance * 2; i++){
-        collidePosition.x += dirx/2 * i;
-        collidePosition.y += diry/2 * i;    
-        if(core.world.collision(collidePosition.x-1,collidePosition.y-1,3,3)){
-            return collidePosition;
-        }
-    }
-    return null;
-}
+
 

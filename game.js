@@ -3,6 +3,7 @@ let syncSpeed = 30;
 let clientId;
 let onlinePlayers = new Array();
 let player = null;
+let spectator = null;
 
 function CreateOnlinePlayer(client){
     if(client.id != clientId){
@@ -21,7 +22,7 @@ function DestroyOnlinePlayer(id){
 
 window.onload = function(){
     document.querySelector("#connexion button").onclick = function(){
-        let pseudo = document.querySelector("#connexion input").value;
+        let pseudo = document.querySelector("#connexion input").value.substring(0,15);
         socket.emit("client_connection",pseudo);
     };
 }
@@ -34,10 +35,12 @@ socket.on("connection_granted",function(connectionData){
     core.init();
     connectionData.otherClients.forEach(CreateOnlinePlayer);
 
+    core.createEntity(new Spectator());
 
     log("---- Welcome to the battle ----");
 
     socket.on("game_restart",function(winner){
+        core.destroyEntity(spectator);
         core.destroyEntity(player);
         core.world.loadlevel();
         player = core.createEntity(new Player(window.innerWidth/2,window.innerHeight/2));
@@ -50,7 +53,7 @@ socket.on("connection_granted",function(connectionData){
         if (document.hidden) {
             socket.emit("client_inactive");
         }else if(player != null){
-            socket.emit("client_position", {position: player.position});
+            socket.emit("client_position", {position: player.position, useJetPack: player.useJetPack});
         }
     },1000/syncSpeed);
 
@@ -68,7 +71,7 @@ socket.on("connection_granted",function(connectionData){
     socket.on("server_position",function(data){
         onlinePlayers.forEach((p)=>{
             if(data.id == p.id){
-                p.sync(data.position);
+                p.sync(data);
             }
         })
     });
@@ -80,7 +83,6 @@ socket.on("connection_granted",function(connectionData){
     });
 
     socket.on("server_bulletHit",function(data){
-        console.log(data,bullets);
         getBullet(data.id).hit(data);
     });
 
