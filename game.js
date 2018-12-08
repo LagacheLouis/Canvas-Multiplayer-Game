@@ -5,10 +5,13 @@ let onlinePlayers = new Array();
 let player = null;
 let spectator = null;
 
+let scoreboard;
+
 function CreateOnlinePlayer(client){
     if(client.id != clientId){
         onlinePlayers.push(core.createEntity(new OnlinePlayer(client.id,client.pseudo)));
     }
+    scoreboard = document.getElementById("scoreboard");
 }
 
 function DestroyOnlinePlayer(id){
@@ -39,14 +42,34 @@ socket.on("connection_granted",function(connectionData){
 
     log("---- Welcome to the battle ----");
 
-    socket.on("game_restart",function(winner){
+    socket.on("game_restart",function(playersData){
         core.destroyEntity(spectator);
         core.destroyEntity(player);
+
+        playersData.sort(function(a,b) {
+            if (a.rank < b.rank)
+                return -1;
+            if (a.rank > b.rank)
+                return 1;
+            return 0;
+        });
+
+
+        scoreboard.innerHTML = "";      
+        playersData.forEach((data)=>{
+            if(data.rank != 0)
+                scoreboard.innerHTML += "<p>"+data.rank + " - " + data.pseudo+"</p>";
+        });
+        scoreboard.classList.add("active");
+        
+
         core.world.loadlevel();
-        player = core.createEntity(new Player(window.innerWidth/2,window.innerHeight/2));
-        if(winner != null)
-            log(winner.pseudo + " won  the game");
-        log("---- game restarting ----");
+
+        setTimeout(()=>{
+            player = core.createEntity(new Player(window.innerWidth/2,window.innerHeight/2));
+            document.getElementById("scoreboard").classList.remove("active");
+            log("---- game restarting ----");
+        },3000);
     });
     
     setInterval(function(){     

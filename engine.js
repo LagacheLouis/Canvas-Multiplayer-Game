@@ -1,11 +1,12 @@
 const core = {};
 
-core.deltaTime = 0;
-core.time = 0;
+let deltaTime = 0;
+let time = 0;
 
 core.entities = new Array();
 core.world = null;
 core.renderer = null;
+core.light = null;
 
 core.createEntity = function(obj){
     this.entities.push(obj);
@@ -29,26 +30,25 @@ core.init = function(){
     this.light = new Light("light");
 
     let canvas_entities = document.getElementById("entities");
-    ctx_entities = canvas_entities.getContext("2d");
+    this.ctx_entities = canvas_entities.getContext("2d");
 
     canvas_entities.width = window.innerWidth;
     canvas_entities.height = window.innerHeight;
 
-
-    this.deltaTime = 0;
-    this.time = Date.now();
+    time = Date.now();
 
     function update(){
 
-        ctx_entities.clearRect(0,0,window.innerWidth,window.innerHeight);
+        core.ctx_entities.clearRect(0,0,window.innerWidth,window.innerHeight);
 
-        this.deltaTime = (Date.now() - this.time)/1000;
-        this.time = Date.now();
+        deltaTime = (Date.now() - time)/1000;
+        time = Date.now();
 
         core.renderer.clear();
+        core.renderer.update();
         core.renderer.draw(core.world.canvas);
 
-        //core.light.draw();
+        core.light.draw();
 
         core.entities.forEach((obj)=>{
             if(typeof obj.update != "undefined")
@@ -56,7 +56,7 @@ core.init = function(){
         });
         core.entities.forEach((obj)=>{
             if(typeof obj.draw != "undefined")
-                obj.draw(ctx_entities);
+                obj.draw();
         });
 
         requestAnimationFrame(update);
@@ -77,6 +77,8 @@ class InputManager{
         document.onmousedown = (e)=>{
             this.removeKey("click");
             this.keys.push("click");
+            if(player != null)
+                e.preventDefault();
         }
 
         document.onmouseup = (e)=>{
@@ -123,7 +125,13 @@ class World{
     }
 
     collision(x,y,w,h){
-        return this.collisionValue(x,y,w,h) != 0;
+        let pix = this.ctx.getImageData(x - w/2, y - h/2, w, h).data; 
+        for (var i = 0, n = pix.length; i < n; i += 4) {
+            if(pix[i+3] > 0){
+                return true;
+            }
+        }
+        return false;
     }
     
     collisionValue(x,y,w,h){
@@ -140,13 +148,10 @@ class World{
         this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
         let img = new Image();
         img.onload = ()=>{
-           this.ctx.drawImage(img,0, 0,this.canvas.width,this.canvas.height);
-           /* this.ctx.rect(0,0,this.canvas.width,this.canvas.height);
-            this.ctx.fillStyle = "green";
-            this.ctx.fill();*/
-            //core.light.calculate();
+            this.ctx.drawImage(img,0, 0,this.canvas.width,this.canvas.height);
+            core.light.calculate();     
         }
-        img.src = "levels/level.png";
+        img.src = "levels/level2.png";
     }
 
     dig(x,y,radius){
@@ -158,8 +163,7 @@ class World{
         this.ctx.fill();
         this.ctx.globalCompositeOperation = 'source-over';
         this.ctx.restore();
-
-        //core.light.calculate();
+        core.light.calculatePart(x-radius,x+radius);
     }
 }
 
@@ -170,6 +174,11 @@ class Renderer{
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
         this.position = {x: 0,y: 0,z: 0};
+
+        this.isShaking = false;
+        this.shakePower = 0;
+        this.shakeTimer = {x: 0,y: 0};
+        this.shake = {x: 0,y: 0};
     }
 
     moveCamera(x,y,z){
@@ -178,8 +187,29 @@ class Renderer{
         this.position.z = z;
     }
 
+    screenShake(power){
+        let ratio = power/1000;
+        this.shakePower = ratio > 0.1 ? 50 * ratio : 0;
+        this.shakeTimer = {x: Math.PI *2 * Math.random(),y: Math.PI *2 * Math.random()};
+        this.isShaking = true;
+    }
+
+    update(){
+        if(this.isShaking){ 
+            this.shake.x += Math.sin(this.shakeTimer.x) * this.shakePower;
+            this.shake.y += Math.sin(this.shakeTimer.y) * this.shakePower;
+            this.shakeTimer.x += deltaTime * 80;  
+            this.shakeTimer.y += deltaTime * 80;         
+            if(this.shakeTimer.x > Math.PI * 2 * 4){
+                this.shakeTimer = {x: 0,y: 0};
+                this.shake = {x: 0,y: 0};
+                this.isShaking = false;
+            }
+        }
+    }
+
     getOffset(){
-        return {x: this.position.x - this.canvas.width/2,y: this.position.y - this.canvas.height/2,z: this.position.z};
+        return {x: this.position.x + this.shake.x - this.canvas.width/2,y: this.position.y + this.shake.y - this.canvas.height/2,z: this.position.z};
     }
  
     draw(data){
@@ -205,39 +235,86 @@ class Light{
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
 
-        this.hits = new Array();
+        this.rays = new Array();
+        this.precision = 400;
+        for(let i = 0;i<this.precision;i++){
+            this.rays.push(new LightRay(4000/this.precision * i));
+        }
     }
 
     calculate(){
-        this.hits.length = 0;
-        let precision = 300;
-        for(let i = 0;i<precision;i++){
-            this.hits.push(raycast(i * (2000/precision),0,0,1,2000));
-        }
+        this.rays.forEach((ray)=>{  
+            ray.hit.y = 0;
+            ray.hit.x = 0;
+        });
+        this.calculatePart(0,2000);
+    }
+
+    calculatePart(min,max){
+        (async () =>{
+            for(let i = 0;i<this.rays.length;i++){
+                if(this.rays[i].hit.x >= min - 1 && this.rays[i].hit.x <= max + 1){
+                    this.rays[i].calculate(); 
+                    await sleep(0);           
+                }
+            }
+        })();
     }
 
     draw(){
         this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+        this.ctx.beginPath();
+
         let of = core.renderer.getOffset();
         this.ctx.beginPath();
-        this.ctx.moveTo(0,0);
-        this.hits.forEach((hit)=>{       
-            this.ctx.lineTo(hit.x - of.x,hit.y - of.y);
+
+                
+        this.ctx.moveTo(0,window.innerHeight);
+        this.ctx.lineTo(0,this.rays[0].hit.y);
+
+        this.rays.forEach((ray)=>{  
+            if(ray.hit.y != 2000){
+                this.ctx.lineTo(ray.hit.x - of.x,ray.hit.y - of.y);
+            }else{
+                this.ctx.lineTo(ray.x - 4000 - of.x,4000 - of.y);
+            }
         });
-        this.ctx.lineTo(this.canvas.width,0);
-        this.ctx.fillStyle = "rgb(255,255,255,0.5)";
+
+        this.ctx.lineTo(window.innerWidth,this.rays[this.precision - 1].hit.y);        
+        this.ctx.lineTo(window.innerWidth,window.innerHeight);
+        this.ctx.filter = 'blur(5px)';
+        this.ctx.fillStyle = "rgba(51,0,0,0.35)";
         this.ctx.fill();
+        this.ctx.filter = 'none';
     }
 }
 
-function raycast(x,y,dirx,diry,distance){
-    let collidePosition = {x: x,y: y};
-    for(let i = 0; i<distance * 2; i++){
-        collidePosition.x += dirx/2 * i;
-        collidePosition.y += diry/2 * i;    
-        if(core.world.collision(collidePosition.x-1,collidePosition.y-1,3,3)){
-            return collidePosition;
-        }
+class LightRay{
+    constructor(x){
+        this.x = x;
+        this.hit = {x: 0,y:0};
     }
-    return collidePosition;
+
+    calculate(){
+        (async () =>{
+            for(let i = this.hit.y; i<2000; i+=10){
+                if(i > this.hit.y){
+                    this.hit.y = i;
+                    this.hit.x = this.x - i;
+                }
+                if(core.world.collision(this.hit.x-1,this.hit.y,1,1)){
+                    return;
+                }
+                await sleep(0); 
+            }
+            this.hit.y = 2000;
+        })();
+    }
+      
 }
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+

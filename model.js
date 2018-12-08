@@ -115,7 +115,7 @@ class Player{
 
         if(core.inputs.getKey("click")){
             if(this.charge < 500){
-                this.charge += 25 * deltaTime;
+                this.charge += 50 * deltaTime;
                  if(this.godmode)
                     this.charge = 500;
             }else{
@@ -130,7 +130,7 @@ class Player{
        
         this.move(this.momentum.x,this.momentum.y);
 
-        if(this.position.y > core.world.canvas.height + 100 || this.position.x < -2000 || this.position.x > core.world.canvas.width + 2000){
+        if(this.position.y > core.world.canvas.height + 100 || this.position.y < -5000 || this.position.x < -2000 || this.position.x > core.world.canvas.width + 2000){
             socket.emit("client_death");
             core.createEntity(new Spectator());
             core.destroyEntity(this);
@@ -141,15 +141,15 @@ class Player{
         }
     }
 
-    draw(ctx){
+    draw(){
+        let ctx = core.ctx_entities;
         document.getElementById("position").innerText = parseInt(this.position.x) + " "+ parseInt(this.position.y);
         document.getElementById("charge").innerText = parseInt(this.charge);
         document.querySelector("#fuel div").style.width = this.jetPackFuel/this.jetPackMaxFuel * 100 +"%";
         drawRect(ctx,this.position.x - core.renderer.getOffset().x,this.position.y - core.renderer.getOffset().y,10,20,"red");
-        let val = 2000;
 
         ctx.beginPath();
-        ctx.rect(-val - core.renderer.getOffset().x,- val - core.renderer.getOffset().y, core.world.canvas.width + val * 2, core.world.canvas.height + val* 2);
+        ctx.rect(-2000 - core.renderer.getOffset().x,- 5000 - core.renderer.getOffset().y, core.world.canvas.width + 4000, core.world.canvas.height + 5100);
         ctx.strokeStyle = "blue";
         ctx.stroke();
     }
@@ -171,6 +171,7 @@ class OnlinePlayer{
         this.position = data.position;
         this.useJetPack = data.useJetPack;
         this.delta = {x: this.position.x - this.renderPosition.x, y: this.position.y - this.renderPosition.y};
+        this.syncTimer = 0;
     }
 
     update(){
@@ -182,7 +183,8 @@ class OnlinePlayer{
         this.renderPosition.y += this.delta.y * deltaTime * syncSpeed;
     }
 
-    draw(ctx){
+    draw(){
+        let ctx = core.ctx_entities;
         let of = core.renderer.getOffset();
 
         ctx.font = "15px Arial";
@@ -194,6 +196,14 @@ class OnlinePlayer{
         drawRect(ctx,this.renderPosition.x - of.x,this.renderPosition.y - of.y,10,20,"blue");
     }
 }
+
+function compare(a, b) {
+    if (a.rank < b.rank)
+       return -1;
+    if (a.rank > b.rank)
+       return 1;
+    return 0;
+  }
 
 let bullets = new Array();
 
@@ -269,13 +279,17 @@ class Bullet{
             player.knock(norm.x * this.explosionPower,norm.y * this.explosionPower);
         }
         core.world.dig(data.position.x,data.position.y,this.explosionSize);
-
+        
+        core.renderer.screenShake(this.explosionPower - 500);
         /**/
 
         this.collide = true;
     }
 
-    draw(ctx){
+    draw(){
+        let ctx = core.ctx_entities;
+
+        ctx = core.light.ctx;
         
         let of = core.renderer.getOffset();
 
@@ -337,7 +351,8 @@ class JetPackParticle{
         this.position.y += simplex.noise2D(0,this.noiseY/5) * 25 * deltaTime;
     }
 
-    draw(ctx){   
+    draw(){   
+        let ctx = core.ctx_entities;
         let of = core.renderer.getOffset();
         ctx.beginPath();
         ctx.arc(this.position.x - of.x,this.position.y - of.y,this.size,0,2 * Math.PI);

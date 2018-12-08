@@ -9,7 +9,6 @@ body{
 }
 
 canvas{
-    pointer-events: none;
     position: fixed;
     top:0;
     left:0;
@@ -84,4 +83,26 @@ canvas{
     right: 0;
     top:0;
     text-align: right;
+}
+
+#scoreboard{
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #232323;
+    transform: translateY(-100vh);
+    transition: 0.5s;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-size: 50px;
+}
+
+#scoreboard.active{
+    transform: translateY(0);
 }

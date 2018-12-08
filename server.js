@@ -42,6 +42,7 @@ io.on('connection', function(socket){
 
             socket.on("client_death",function(){
                 client.alive = false;
+                connected_clients.forEach(client => client.updateRank());
                 tryRestart();
             });
 
@@ -74,10 +75,10 @@ function tryRestart(){
     let alives = connected_clients.filter(client => client.alive);
     console.log(alives.length+" player(s) alive");
     if(alives.length <= 1){
-        io.emit("game_restart",alives[0]);
+        io.emit("game_restart",connected_clients);
         console.log("restart ...");
         connected_clients.forEach((client)=>{
-            client.alive = true;
+            client.reset();
         });
     }
 }
@@ -91,5 +92,17 @@ class GameClient{
         this.id = id;
         this.pseudo = pseudo;
         this.alive = false;
+        this.rank = 0;
+    }
+
+    updateRank(){
+        if(this.alive){
+            this.rank--;
+        }
+    }
+
+    reset(){
+        this.alive = true;
+        this.rank = connected_clients.length;
     }
 }
