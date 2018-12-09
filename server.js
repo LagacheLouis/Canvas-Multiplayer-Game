@@ -41,6 +41,7 @@ io.on('connection', function(socket){
             });
 
             socket.on("client_death",function(){
+                io.emit("server_player_death",client);
                 client.alive = false;
                 connected_clients.forEach(client => client.updateRank());
                 tryRestart();

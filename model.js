@@ -5,9 +5,19 @@ class Player{
         this.momentum = {x: 0,y: 0};
         this.attackTimer = 0;
         this.isGrounded = false;
-        this.jetPackMaxFuel = 3;
-        this.jetPackFuel = 3;
+        this.jetPackMaxFuel = 5;
+        this.jetPackFuel = 5;
         this.charge = 0;
+
+        this.sprite_l = new Image();
+        this.sprite_r = new Image();
+
+        this.sprite_l.src = "levels/player_l.png";
+        this.sprite_r.src = "levels/player_r.png";
+
+        this.lookLeft = false;
+
+        this.angle =  0;
 
         this.useJetPack = false;
 
@@ -18,12 +28,12 @@ class Player{
 
     move(x,y){
 
-        if(core.world.collision(this.position.x + x  * deltaTime,this.position.y + y * deltaTime,10,20)){
+        if(core.world.collision(this.position.x + x  * deltaTime,this.position.y + y * deltaTime,20,32)){
             this.momentum.x = clamp(this.momentum.x,-200,200);
             this.momentum.y = clamp(this.momentum.y,-200,200);
         }
 
-        if(!core.world.collision(this.position.x,this.position.y + y * deltaTime,10,20)){
+        if(!core.world.collision(this.position.x,this.position.y + y * deltaTime,20,32)){
             this.position.y += y * deltaTime;
             this.isGrounded = false;
         }else if(y >= 0){       
@@ -31,8 +41,8 @@ class Player{
             let dir = 1;
             do{
                 for(let i = 0;i<10;i++){
-                    if(!core.world.collision(this.position.x + dir,this.position.y + y * deltaTime,10,20)){
-                        let colvalue = core.world.collisionValue(this.position.x + -dir * 15, this.position.y + y * deltaTime,20,20);
+                    if(!core.world.collision(this.position.x + dir,this.position.y + y * deltaTime,20,32)){
+                        let colvalue = core.world.collisionValue(this.position.x + -dir * 24, this.position.y + y * deltaTime,32,32);
                         if(colvalue > 0.85){
                             this.position.y += y * deltaTime;
                             this.position.x += dir;
@@ -49,10 +59,10 @@ class Player{
         if(x != 0){
             if(this.isGrounded){ 
                 for(let i= -11;i<11;i++){
-                    let colvalue = core.world.collisionValue(this.position.x + Math.sign(x) * 15 + x * deltaTime, this.position.y - i ,20,20);   
+                    let colvalue = core.world.collisionValue(this.position.x + Math.sign(x) * 24 + x * deltaTime, this.position.y - i ,32,32);   
                     let val = colvalue > 0.6 ? (1 - colvalue): 1;
-                    if(!core.world.collision(this.position.x + x * deltaTime * val,this.position.y - i,10,20)){
-                        if(core.world.collision(this.position.x + x * deltaTime * val,this.position.y - i + 5,10,20)){
+                    if(!core.world.collision(this.position.x + x * deltaTime * val,this.position.y - i,20,32)){
+                        if(core.world.collision(this.position.x + x * deltaTime * val,this.position.y - i + 5,20,32)){
                             this.position.y -= i;
                         }                             
                         this.position.x += x * deltaTime * val;
@@ -60,7 +70,7 @@ class Player{
                     }                                 
                 }
             }else{
-                if(!core.world.collision(this.position.x + x * deltaTime,this.position.y,10,20)){     
+                if(!core.world.collision(this.position.x + x * deltaTime,this.position.y,20,32)){     
                     this.position.x += x * deltaTime;
                 }
             }             
@@ -68,6 +78,7 @@ class Player{
     }
 
     knock(x,y){
+        this.angle += Math.PI * 2;
         this.momentum.x += x;
         this.momentum.y += y;
     }
@@ -85,23 +96,24 @@ class Player{
             this.momentum.x += 300 * deltaTime;
         }else{
             this.momentum.x -= Math.sign(this.momentum.x) * 300 * deltaTime;
+            if(Math.abs(this.momentum.x) < 1)
+                this.momentum.x = 0;
         }
 
         this.particleTimer += deltaTime;
 
         //IS GROUNDED
-       if(this.isGrounded){
+        if(this.isGrounded){
             this.jetPackFuel = clamp(this.jetPackFuel + deltaTime,0,this.jetPackMaxFuel);
            if(core.inputs.getKey("z") && this.momentum.y > -200){
                 this.momentum.y = -200;
             }
             this.useJetPack = false;
-        }else if(core.inputs.getKey("z") && this.jetPackFuel > 0 && this.momentum.y > -150){
+        }else if(core.inputs.getKey("z") && this.jetPackFuel > 0){
             if(this.momentum.y > -200){
                 this.momentum.y -= 1000 * deltaTime;
-                if(!this.godmode)
-                    this.jetPackFuel = clamp(this.jetPackFuel - deltaTime,0,this.jetPackMaxFuel);
             }
+            this.jetPackFuel = clamp(this.jetPackFuel - deltaTime,0,this.jetPackMaxFuel);
             core.createEntity(new JetPackParticle(this.position));
             this.useJetPack = true;
         }else  if(this.momentum.y < 200){
@@ -136,9 +148,17 @@ class Player{
             core.destroyEntity(this);
         }
 
-        if(core.inputs.getKey("p")){
-           // this.godmode = true; 
+      
+
+        this.lookLeft = core.inputs.mousepos.x < window.innerWidth / 2;
+        let n_angle = 0;
+        if(!this.isGrounded && Math.abs(this.momentum.x) > 5){
+           n_angle = Math.atan2(this.momentum.y,this.momentum.x) + Math.PI/2;
         }
+
+        this.angle += shortAngleDist(this.angle,n_angle) * 0.1;
+        this.lookLeft = core.inputs.mousepos.x < window.innerWidth / 2 && (this.angle > (Math.PI * 2)/3 || this.angle < Math.PI/2);
+
     }
 
     draw(){
@@ -146,7 +166,21 @@ class Player{
         document.getElementById("position").innerText = parseInt(this.position.x) + " "+ parseInt(this.position.y);
         document.getElementById("charge").innerText = parseInt(this.charge);
         document.querySelector("#fuel div").style.width = this.jetPackFuel/this.jetPackMaxFuel * 100 +"%";
-        drawRect(ctx,this.position.x - core.renderer.getOffset().x,this.position.y - core.renderer.getOffset().y,10,20,"red");
+
+
+        let of = core.renderer.getOffset();
+        let pos = {x: this.position.x - of.x, y:this.position.y - of.y};
+        ctx.save();
+        ctx.translate(pos.x,pos.y);
+        ctx.rotate(this.angle);
+        if(this.lookLeft && this.sprite_l.complete){
+            ctx.drawImage(this.sprite_l, - 16, - 16,32,32);
+        }else if(this.sprite_r.complete){
+            ctx.drawImage(this.sprite_r, - 16, - 16,32,32);
+        }
+        ctx.restore();
+           
+  
 
         ctx.beginPath();
         ctx.rect(-2000 - core.renderer.getOffset().x,- 5000 - core.renderer.getOffset().y, core.world.canvas.width + 4000, core.world.canvas.height + 5100);
@@ -165,12 +199,23 @@ class OnlinePlayer{
 
         this.delta = {x: 0, y: 0};
         this.useJetPack = false;
+
+        this.sprite_l = new Image();
+        this.sprite_r = new Image();
+
+        this.sprite_l.src = "levels/player_l.png";
+        this.sprite_r.src = "levels/player_r.png";
+
+        this.angle = 0;
+        this.lookLeft = false;
     }
 
     sync(data){
         this.position = data.position;
         this.useJetPack = data.useJetPack;
         this.delta = {x: this.position.x - this.renderPosition.x, y: this.position.y - this.renderPosition.y};
+        this.lookLeft = data.lookLeft;
+        this.angle = data.angle;
         this.syncTimer = 0;
     }
 
@@ -192,8 +237,23 @@ class OnlinePlayer{
         ctx.fillStyle= "rgba(128,128,128,1)";
         ctx.fillText(this.pseudo,this.renderPosition.x - of.x,this.renderPosition.y - 20 - of.y);
         
+        let pos = {x: this.renderPosition.x - of.x, y:this.renderPosition.y - of.y};
 
-        drawRect(ctx,this.renderPosition.x - of.x,this.renderPosition.y - of.y,10,20,"blue");
+        ctx.save();
+        ctx.translate(pos.x,pos.y);
+        ctx.rotate(this.angle);
+        if(this.lookLeft && this.sprite_l.complete){
+            ctx.drawImage(this.sprite_l, - 16, - 16,32,32);
+        }else if(this.sprite_r.complete){
+            ctx.drawImage(this.sprite_r, - 16, - 16,32,32);
+        }
+        ctx.restore();
+
+        if(pos.x < 0 || pos.x > window.innerWidth || pos.y < 0 || pos.y > window.innerHeight){     
+            let pointer = {x: clamp(this.renderPosition.x - of.x,0,window.innerWidth),y: clamp(this.renderPosition.y - of.y,0,window.innerHeight)};
+            drawRect(core.light.ctx,pointer.x,pointer.y,40,40,"white",45);
+        }
+
     }
 }
 
@@ -274,7 +334,7 @@ class Bullet{
     hit(data){
 
         let playerdelta = {x: player.position.x - data.position.x, y: player.position.y - data.position.y};
-        if(vectorMagnitude(playerdelta) < this.explosionSize + 20){
+        if(vectorMagnitude(playerdelta) < this.explosionSize + 25){
             let norm = vectorNormalize(playerdelta);
             player.knock(norm.x * this.explosionPower,norm.y * this.explosionPower);
         }

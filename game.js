@@ -43,8 +43,8 @@ socket.on("connection_granted",function(connectionData){
     log("---- Welcome to the battle ----");
 
     socket.on("game_restart",function(playersData){
-        core.destroyEntity(spectator);
-        core.destroyEntity(player);
+        //destroy all entities
+        core.entities.length = 0;
 
         playersData.sort(function(a,b) {
             if (a.rank < b.rank)
@@ -54,7 +54,6 @@ socket.on("connection_granted",function(connectionData){
             return 0;
         });
 
-
         scoreboard.innerHTML = "";      
         playersData.forEach((data)=>{
             if(data.rank != 0)
@@ -62,11 +61,12 @@ socket.on("connection_granted",function(connectionData){
         });
         scoreboard.classList.add("active");
         
-
+        playersData.forEach(CreateOnlinePlayer);
+        
         core.world.loadlevel();
 
         setTimeout(()=>{
-            player = core.createEntity(new Player(window.innerWidth/2,window.innerHeight/2));
+            player = core.createEntity(new Player(Math.random() * WORLD_SIZE,Math.random() * WORLD_SIZE - 200));
             document.getElementById("scoreboard").classList.remove("active");
             log("---- game restarting ----");
         },3000);
@@ -76,13 +76,12 @@ socket.on("connection_granted",function(connectionData){
         if (document.hidden) {
             socket.emit("client_inactive");
         }else if(player != null){
-            socket.emit("client_position", {position: player.position, useJetPack: player.useJetPack});
+            socket.emit("client_position", {position: player.position, useJetPack: player.useJetPack,lookLeft : player.lookLeft, angle: player.angle});
         }
     },1000/syncSpeed);
 
    
     socket.on("server_player_connect",function(client){
-        CreateOnlinePlayer(client);
         log(client.pseudo+" comes to the battle");
     });
 
@@ -97,6 +96,12 @@ socket.on("connection_granted",function(connectionData){
                 p.sync(data);
             }
         })
+    });
+
+    
+    socket.on("server_player_death",function(data){
+        log(data.pseudo +" is dead");
+        DestroyOnlinePlayer(data.id);
     });
 
     socket.on("server_createBullet",function(data){

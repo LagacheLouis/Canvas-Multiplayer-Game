@@ -8,6 +8,8 @@ core.world = null;
 core.renderer = null;
 core.light = null;
 
+const WORLD_SIZE = 2500;
+
 core.createEntity = function(obj){
     this.entities.push(obj);
     return obj;
@@ -54,10 +56,11 @@ core.init = function(){
             if(typeof obj.update != "undefined")
                 obj.update();
         });
-        core.entities.forEach((obj)=>{
-            if(typeof obj.draw != "undefined")
-                obj.draw();
-        });
+
+        for(let i = core.entities.length - 1; i>=0 ;i--){
+            if(typeof core.entities[i].draw != "undefined")
+                core.entities[i].draw();
+        }
 
         requestAnimationFrame(update);
     }
@@ -118,8 +121,8 @@ class World{
     constructor(id){
         this.canvas = document.getElementById(id);
         this.ctx = this.canvas.getContext("2d");
-        this.canvas.width = 2000;
-        this.canvas.height = 2000;
+        this.canvas.width = WORLD_SIZE;
+        this.canvas.height = WORLD_SIZE;
         this.canvas.style.display = "none";
         setImageSmoothing(this.ctx,false);
     }
@@ -238,7 +241,7 @@ class Light{
         this.rays = new Array();
         this.precision = 400;
         for(let i = 0;i<this.precision;i++){
-            this.rays.push(new LightRay(4000/this.precision * i));
+            this.rays.push(new LightRay((WORLD_SIZE * 2)/this.precision * i));
         }
     }
 
@@ -247,7 +250,9 @@ class Light{
             ray.hit.y = 0;
             ray.hit.x = 0;
         });
-        this.calculatePart(0,2000);
+        setTimeout(()=>{
+            this.calculatePart(0,WORLD_SIZE);
+        },10);
     }
 
     calculatePart(min,max){
@@ -273,17 +278,17 @@ class Light{
         this.ctx.lineTo(0,this.rays[0].hit.y);
 
         this.rays.forEach((ray)=>{  
-            if(ray.hit.y != 2000){
+            if(ray.hit.y != WORLD_SIZE){
                 this.ctx.lineTo(ray.hit.x - of.x,ray.hit.y - of.y);
             }else{
-                this.ctx.lineTo(ray.x - 4000 - of.x,4000 - of.y);
+                this.ctx.lineTo(ray.x - WORLD_SIZE * 2 - of.x,WORLD_SIZE * 2 - of.y);
             }
         });
 
         this.ctx.lineTo(window.innerWidth,this.rays[this.precision - 1].hit.y);        
         this.ctx.lineTo(window.innerWidth,window.innerHeight);
         this.ctx.filter = 'blur(5px)';
-        this.ctx.fillStyle = "rgba(51,0,0,0.35)";
+        this.ctx.fillStyle = "rgba(51,0,0,0.3)";
         this.ctx.fill();
         this.ctx.filter = 'none';
     }
@@ -297,7 +302,7 @@ class LightRay{
 
     calculate(){
         (async () =>{
-            for(let i = this.hit.y; i<2000; i+=10){
+            for(let i = this.hit.y; i<WORLD_SIZE; i+=10){
                 if(i > this.hit.y){
                     this.hit.y = i;
                     this.hit.x = this.x - i;
@@ -307,7 +312,7 @@ class LightRay{
                 }
                 await sleep(0); 
             }
-            this.hit.y = 2000;
+            this.hit.y = WORLD_SIZE;
         })();
     }
       
